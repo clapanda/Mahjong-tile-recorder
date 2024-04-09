@@ -4,6 +4,7 @@ from PIL import Image, ImageTk
 import pygetwindow as gw
 import pyautogui
 import cv2
+from matplotlib import pyplot as plt
 import numpy as np
 import torch
 from torchvision import models, transforms
@@ -42,13 +43,11 @@ def capture_window_by_title(title, panel):
             pyautogui.sleep(1)
             x, y, width, height = win.left, win.top, win.width, win.height
 
-            target_height = height // 6
-            target_y = y + height - target_height
-
-            adjust_left = width * 0.1  # 根据新逻辑调整宽度
-            adjust_right = width * 0.27
-            new_width = width - (adjust_left + adjust_right)
-            new_x = x + adjust_left
+            # 根据提供的测量信息计算捕获区域的具体尺寸
+            target_y = y + 450  # 去除上方450像素
+            target_height = height - 450 - 14  # 去除下方14像素
+            new_x = x + 107  # 去除左侧107像素
+            new_width = width - 107 - 157  # 去除右侧157像素
 
             img = pyautogui.screenshot(region=(int(new_x), int(target_y), int(new_width), int(target_height)))
 
@@ -67,15 +66,37 @@ def preprocess_image(image):
     return denoised
 
 # 图像分割
-def segment_tiles(preprocessed_image, pixels_per_cm=50):
-    tile_width_pixels, gap_width_pixels = int(0.71 * pixels_per_cm), int(0.2 * pixels_per_cm)
+import cv2
+from matplotlib import pyplot as plt
+
+
+def segment_tiles(preprocessed_image):
+    tile_width = 40  # 每张牌的宽度是40像素
+    gap_between_tiles = 2  # 牌与牌之间的间隔是2像素
+    large_gap = 12  # 第13张和第14张牌之间的间隔是12像素
     tiles = []
-    for i in range(13):  # 前13张牌紧密相连
-        start_x = i * tile_width_pixels
-        tiles.append(preprocessed_image[:, start_x:start_x + tile_width_pixels])
-    start_x_14th = 13 * tile_width_pixels + gap_width_pixels  # 第14张牌与前面有间隔
-    tiles.append(preprocessed_image[:, start_x_14th:start_x_14th + tile_width_pixels])
+
+    # 分割前13张牌
+    for i in range(13):
+        start_x = i * (tile_width + gap_between_tiles)
+        tile = preprocessed_image[:, start_x:start_x + tile_width]
+        tiles.append(tile)
+
+    # 分割第14张牌
+    start_x_14th = 13 * (tile_width + gap_between_tiles) + large_gap
+    tile_14th = preprocessed_image[:, start_x_14th:start_x_14th + tile_width]
+    tiles.append(tile_14th)
+
+    # 显示每张分割后的牌
+    for i, tile in enumerate(tiles):
+        plt.figure(figsize=(2, 2))
+        plt.imshow(cv2.cvtColor(tile, cv2.COLOR_BGR2RGB))
+        plt.title(f'Tile {i+1}')
+        plt.axis('off')
+        plt.show()
+
     return tiles
+
 
 # 牌面识别
 def recognize_tiles(tiles):
